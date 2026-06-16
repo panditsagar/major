@@ -12,16 +12,18 @@ const upload = multer({storage});
 
 router.route("/")
 .get(wrapAsync(listingcontroller.index))
-.post(isLoggedIn,validateListing,wrapAsync(listingcontroller.createListing));
+.post(isLoggedIn, upload.single("listing[image]"), validateListing, wrapAsync(listingcontroller.createListing));
 // .post(upload.single("listing[image]"),(req,res)=>{
 //     res.send(req.file);
 // })
 
 //new route
 router.get("/new",isLoggedIn, listingcontroller.renderNewForm);
+
+router.get("/search", wrapAsync(listingcontroller.searchListings));
    
 router.route("/:id")
-.put(isLoggedIn,isOwner,validateListing,wrapAsync(listingcontroller.updateListing))
+.put(isLoggedIn, isOwner, upload.single("listing[image]"), validateListing, wrapAsync(listingcontroller.updateListing))
 .get(wrapAsync(listingcontroller.showListing)) 
 .delete(isLoggedIn,isOwner,wrapAsync(listingcontroller.deleteListing));
 

@@ -1,27 +1,3 @@
-<style>
-  .btn-search{
-    background-color: #fe444d;
-    color:#fff ;
-    
-    padding: 0 1rem 0 1rem;
-  }
-  .btn-search:hover{
-    background-color: #fe444d;
-    color:#fff ;
-  }
-  .btn-search i{
-    display: inline;
-    margin-right: 0.5rem;
-  }
-  .search-inp{
-    padding-right:  5rem;
-    
-  }
-.navbar-nav{
-  margin-left: 1rem;
-}
-</style>
-
 <nav class="navbar navbar-expand-md bg-body-light border-bottom sticky-top">
     <div class="container-fluid">
       <a class="navbar-brand" href="/listings"><i class="fa-regular fa-compass sticky-top"></i></a>
@@ -34,10 +10,10 @@
           <a class="nav-link" href="/listings">Explore</a>
           <a class="nav-link" href="#">About</a>
        </div>
-       <div class="navbar-nav ms-auto">
-        <form class="d-flex" role="search">
-          <input class="form-control me-2 search-inp" type="search" placeholder="Search destinations" >
-          <button class="btn btn-search" type="submit"><i class="fa-solid fa-magnifying-glass"></i>Search</button>
+       <div class="navbar-nav ms-auto search-nav">
+        <form class="global-search-form" role="search" action="/listings/search" method="GET">
+          <input class="global-search-input" type="search" name="q" value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" placeholder="Search destinations" autocomplete="off">
+          <button class="global-search-btn" type="submit" aria-label="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
         </form>
        </div>
        <div class="navbar-nav ms-auto">
