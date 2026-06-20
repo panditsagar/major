@@ -40,79 +40,108 @@ app.use(methodOverride("_method"));
 app.engine("ejs", ejsMate);
 app.use(express.static(path.join(__dirname, "/public")));
 
-async function startServer() {
-  for (let key of requiredEnv) {
-    if (!process.env[key]) {
-      throw new Error(`${key} is missing in .env`);
-    }
+for (const key of requiredEnv) {
+  if (!process.env[key]) {
+    throw new Error(`${key} is missing in the environment`);
   }
-
-  await mongoose.connect(dbUrl, {
-    serverSelectionTimeoutMS: 5000,
-  });
-  console.log("connection to DB");
-
-  const store = MongoStore.create({
-    mongoUrl: dbUrl,
-    crypto: {
-      secret,
-    },
-    touchAfter: 24 * 3600,
-  });
-
-  store.on("error", (err) => {
-    console.log("ERROR IN MONGO SESSION STORE", err);
-  });
-
-  const sessionOptions = {
-    store,
-    secret,
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-      expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
-    },
-  };
-
-  app.use(session(sessionOptions));
-  app.use(flash());
-
-  // Use passport after session middleware.
-  app.use(passport.initialize());
-  app.use(passport.session());
-  passport.use(new LocalStrategy(User.authenticate()));
-  passport.serializeUser(User.serializeUser());
-  passport.deserializeUser(User.deserializeUser());
-
-  app.use((req, res, next) => {
-    res.locals.success = req.flash("success");
-    res.locals.error = req.flash("error");
-    res.locals.currUser = req.user;
-    next();
-  });
-
-  app.get("/", wrapAsync(listingController.index));
-  app.use("/listings", listingsRouter);
-  app.use("/listings/:id/reviews", reviewsRouter);
-  app.use("/", userRouter);
-
-  app.all("*", (req, res, next) => {
-    next(new ExpressError(404, "page not found"));
-  });
-
-  app.use((err, req, res, next) => {
-    let { statusCode = 500, message = "Somthing went wrong" } = err;
-    res.status(statusCode).render("error.ejs", { message });
-  });
-
-  app.listen(8080, () => {
-    console.log("server is listening to port : 8080");
-  });
 }
 
-startServer().catch((err) => {
-  console.error("Failed to start server:", err.message);
-  process.exit(1);
+let databaseConnection;
+
+function connectDatabase() {
+  if (!databaseConnection) {
+    databaseConnection = mongoose
+      .connect(dbUrl, { serverSelectionTimeoutMS: 5000 })
+      .then(() => {
+        console.log("connected to DB");
+      })
+      .catch((err) => {
+        databaseConnection = undefined;
+        throw err;
+      });
+  }
+
+  return databaseConnection;
+}
+
+// Ensure the shared database connection is ready before handling a request.
+app.use(async (req, res, next) => {
+  try {
+    await connectDatabase();
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
+
+const store = MongoStore.create({
+  mongoUrl: dbUrl,
+  crypto: {
+    secret,
+  },
+  touchAfter: 24 * 3600,
+});
+
+store.on("error", (err) => {
+  console.log("ERROR IN MONGO SESSION STORE", err);
+});
+
+const sessionOptions = {
+  store,
+  secret,
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+  },
+};
+
+app.use(session(sessionOptions));
+app.use(flash());
+
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+app.use((req, res, next) => {
+  res.locals.success = req.flash("success");
+  res.locals.error = req.flash("error");
+  res.locals.currUser = req.user;
+  next();
+});
+
+app.get("/", wrapAsync(listingController.index));
+app.use("/listings", listingsRouter);
+app.use("/listings/:id/reviews", reviewsRouter);
+app.use("/", userRouter);
+
+app.all("*", (req, res, next) => {
+  next(new ExpressError(404, "page not found"));
+});
+
+app.use((err, req, res, next) => {
+  const { statusCode = 500, message = "Something went wrong" } = err;
+  res.status(statusCode).render("error.ejs", { message });
+});
+
+// Vercel invokes this exported Express application as a serverless function.
+module.exports = app;
+
+// Keep the normal local `npm start` workflow.
+if (require.main === module) {
+  const port = process.env.PORT || 8080;
+  connectDatabase()
+    .then(() => {
+      app.listen(port, () => {
+        console.log(`server is listening on port ${port}`);
+      });
+    })
+    .catch((err) => {
+      console.error("Failed to start server:", err.message);
+      process.exitCode = 1;
+    });
+}
